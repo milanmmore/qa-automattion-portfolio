@@ -30,3 +30,50 @@ Cypress.Commands.add('login', (username, password) => {
   cy.get('input[name="password"]').type(password);
   cy.get('input[type="submit"]').click();
 });
+
+Cypress.Commands.add('submitContactForm', (name, email, phone , message, interceptAlias = 'contactSubmit') => {
+  cy.intercept('POST', '/parabank/contact.htm').as(interceptAlias);
+
+  cy.visit('/parabank/contact.htm');
+
+  cy.get('input[name="name"]').type(name);
+  cy.get('input[name="email"]').type(email);
+  cy.get('input[name="phone"]').type(phone); 
+  cy.get('textarea[name="message"]').type(message);
+
+  cy.get('input[value="Send to Customer Care"]').click();
+  //cy.get('form').submit();
+
+cy.wait(`@${interceptAlias}`).then((interception) => {
+  expect(interception.response.statusCode).to.eq(200);
+
+  const parsedBody = new URLSearchParams(interception.request.body);
+  expect(parsedBody.get('message')).to.eq('This is a test message.');
+});
+
+});
+
+Cypress.Commands.add('submitContactFormWithStub', (name, email, phone, message, stubResponse) => {
+  cy.intercept('POST', '**/contact.htm', stubResponse).as('contactStub');
+
+  cy.visit('/parabank/contact.htm');
+
+  cy.get('input[name="name"]').type(name);
+  cy.get('input[name="email"]').type(email);
+  cy.get('input[name="phone"]').type(phone);
+  cy.get('textarea[name="message"]').type(message);
+
+  cy.get('input[value="Send to Customer Care"]').click();
+
+  cy.document().then((doc) => {
+  console.log(doc.body.innerHTML);
+  });
+
+  // Verify the stubbed response
+  //cy.wait('@contactStub');
+  cy.wait('@contactStub').its('response.statusCode').should('eq', 500);
+
+  cy.contains('Internal Server Error').should('be.visible');
+  
+});
+
